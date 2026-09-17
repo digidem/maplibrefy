@@ -1,6 +1,6 @@
 {
   "name": "maplibrefy",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Best-effort conversion of Mapbox GL styles so they load in MapLibre GL, plus mapbox:// URL rewriting",
   "keywords": [
     "maplibre",
