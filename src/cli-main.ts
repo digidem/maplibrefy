@@ -108,7 +108,10 @@ function describe(change: Change): string {
     case 'imports-removed':
       return `imports-removed: ${change.ids.join(', ')}`
     case 'root-removed':
-      return `root-removed: ${change.key}`
+      // The reason is only informative when it is not the usual one.
+      return change.reason === 'Mapbox-only property'
+        ? `root-removed: ${change.key}`
+        : `root-removed: ${change.key} — ${change.reason}`
     case 'root-property-removed':
       return `root-property-removed: ${change.key}.${change.property} — ${change.reason}`
     case 'projection-rewritten':

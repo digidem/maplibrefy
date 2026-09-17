@@ -89,16 +89,18 @@ interface ConvertResult {
 Every edit made, as data rather than prose, so apps can act on the ones that
 matter to them:
 
-| `kind`                 | Meaning                                                                                                                                          |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `imports-removed`      | The style was built on an imported basemap (Mapbox Standard). Only the style's own layers remain, over nothing. Apps should tell the user.       |
-| `root-removed`         | A Mapbox-only top-level key (`fog`, `lights`, `schema`, …) was dropped.                                                                          |
-| `projection-rewritten` | `projection.name` became `projection.type`, or was forced to `mercator`.                                                                         |
-| `expression-rewritten` | A Mapbox-only expression was replaced by an equivalent (`path` is the JSON pointer-ish location, `operator` the expression that was replaced).   |
-| `property-removed`     | A paint or layout property MapLibre rejected was dropped from a layer; the layer renders with the default.                                       |
-| `filter-removed`       | A layer's filter used something MapLibre rejected; the layer now shows all features.                                                             |
-| `layer-removed`        | A layer MapLibre cannot render at all (`model`, `slot`, `clip`, `sky`, `raster-particle`, `building`) or whose definition could not be repaired. |
-| `source-removed`       | A Mapbox-only source type (`raster-array`, `model`) and every layer using it.                                                                    |
+| `kind`                    | Meaning                                                                                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `imports-removed`         | The style was built on an imported basemap (Mapbox Standard). Only the style's own layers remain, over nothing. Apps should tell the user.       |
+| `root-removed`            | A Mapbox-only top-level key (`fog`, `lights`, `schema`, …) was dropped, or `terrain` because its source was removed.                             |
+| `root-property-removed`   | One property MapLibre rejected inside `projection`, `light`, `sky` or `terrain` was dropped; the rest of that object stays.                      |
+| `projection-rewritten`    | `projection.name` became `projection.type`; a projection MapLibre lacks (`albers`, `equalEarth`, …) or a forced `'mercator'` became `mercator`.  |
+| `expression-rewritten`    | A Mapbox-only expression was replaced by an equivalent (`path` is the JSON pointer-ish location, `operator` the expression that was replaced).   |
+| `property-removed`        | A paint or layout property MapLibre rejected was dropped from a layer; the layer renders with the default.                                       |
+| `filter-removed`          | A layer's filter used something MapLibre rejected; the layer now shows all features.                                                             |
+| `layer-removed`           | A layer MapLibre cannot render at all (`model`, `slot`, `clip`, `sky`, `raster-particle`, `building`) or whose definition could not be repaired. |
+| `source-property-removed` | One property MapLibre rejected on a source (Mapbox's GeoJSON `dynamic`, say) was dropped; the source and its layers stay.                        |
+| `source-removed`          | A Mapbox-only source type (`raster-array`, `model`) and every layer using it.                                                                    |
 
 ### `createTransformStyle(options?): TransformStyleFunction`
 
@@ -114,7 +116,10 @@ it as the style's error instead of loading half a style. The
 Fetches and converts a style. `url` may be an `http(s)` URL, a
 `mapbox://styles/{owner}/{id}` URI, or any of the share/preview URLs Mapbox
 Studio shows for a style. Mapbox URLs need `options.accessToken` (a token in
-the URL's `access_token` query parameter is also honoured). Relative `sprite`,
+the URL's `access_token` query parameter is also honoured; the option wins
+when both are present). A pasted `api.mapbox.com/styles/v1/{owner}/{id}`
+URL is fetched as given, so extra query parameters such as Studio's
+`fresh=true` survive; every other form is normalised to that URL. Relative `sprite`,
 `glyphs`, source `url`s and GeoJSON `data` URLs are resolved against the URL
 the style was actually served from (after redirects) before conversion,
 because MapLibre does not do that itself for a style object. `tiles`
