@@ -1,5 +1,5 @@
 {
-  "name": "maplibrify",
+  "name": "maplibrefy",
   "version": "0.0.0",
   "description": "Best-effort conversion of Mapbox GL styles so they load in MapLibre GL, plus mapbox:// URL rewriting",
   "keywords": [
@@ -12,7 +12,7 @@
     "transformRequest"
   ],
   "license": "MIT",
-  "repository": "github:digidem/maplibrify",
+  "repository": "github:digidem/maplibrefy",
   "type": "module",
   "exports": {
     ".": {
@@ -26,7 +26,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "maplibrify": "./dist/cli.js"
+    "maplibrefy": "./dist/cli.js"
   },
   "files": [
     "dist"

@@ -11,9 +11,9 @@ export interface CliIo {
   stderr: NodeJS.WritableStream
 }
 
-const USAGE = `maplibrify — convert a Mapbox GL style so MapLibre GL loads it
+const USAGE = `maplibrefy — convert a Mapbox GL style so MapLibre GL loads it
 
-Usage: maplibrify [file] [options]
+Usage: maplibrefy [file] [options]
 
   file                  style JSON to read; stdin when omitted or "-"
 
@@ -137,7 +137,7 @@ function summarize(count: number): string {
 }
 
 function fail(io: CliIo, message: string): number {
-  io.stderr.write(`maplibrify: ${message}\n`)
+  io.stderr.write(`maplibrefy: ${message}\n`)
   return 1
 }
 

@@ -1,5 +1,5 @@
 ---
-'maplibrify': minor
+'maplibrefy': minor
 ---
 
 `convertStyle` now repairs instead of dropping where it can: a source with one

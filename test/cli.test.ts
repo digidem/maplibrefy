@@ -89,7 +89,7 @@ describe('run', () => {
     const { code, err } = await cli(['--projection', 'globe'])
     expect(code).toBe(1)
     expect(lines(err)).toHaveLength(1)
-    expect(err).toMatch(/^maplibrify: --projection must be/)
+    expect(err).toMatch(/^maplibrefy: --projection must be/)
   })
 
   it('--quiet keeps only the summary', async () => {
@@ -104,7 +104,7 @@ describe('run', () => {
   it('--help prints usage to stdout', async () => {
     const { code, out, err } = await cli(['--help'])
     expect(code).toBe(0)
-    expect(out).toMatch(/Usage: maplibrify \[file\] \[options\]/)
+    expect(out).toMatch(/Usage: maplibrefy \[file\] \[options\]/)
     expect(err).toBe('')
   })
 
@@ -119,7 +119,7 @@ describe('run', () => {
     expect(code).toBe(1)
     expect(out).toBe('')
     expect(lines(err)).toHaveLength(1)
-    expect(err).toMatch(/^maplibrify: invalid JSON: /)
+    expect(err).toMatch(/^maplibrefy: invalid JSON: /)
   })
 
   it('exits 1 on JSON that is not a style', async () => {
@@ -127,7 +127,7 @@ describe('run', () => {
     expect(code).toBe(1)
     expect(out).toBe('')
     expect(lines(err)).toHaveLength(1)
-    expect(err).toMatch(/^maplibrify: convertStyle: expected a style object/)
+    expect(err).toMatch(/^maplibrefy: convertStyle: expected a style object/)
   })
 
   it('exits 1 on an unreadable file', async () => {
@@ -140,7 +140,7 @@ describe('run', () => {
   it('exits 1 on an unknown flag', async () => {
     const { code, err } = await cli(['--nope'])
     expect(code).toBe(1)
-    expect(err).toMatch(/^maplibrify: .*--nope/)
+    expect(err).toMatch(/^maplibrefy: .*--nope/)
   })
 
   it('exits 1 on more than one file argument', async () => {
@@ -213,8 +213,8 @@ describe('run', () => {
     const [out, err] = await collected
     expect(code).toBe(1)
     expect(out).toBe('')
-    expect(err).toMatch(/^maplibrify — /)
-    expect(err).toMatch(/Usage: maplibrify \[file\] \[options\]/)
+    expect(err).toMatch(/^maplibrefy — /)
+    expect(err).toMatch(/Usage: maplibrefy \[file\] \[options\]/)
   })
 
   it('still reads a terminal stdin when "-" is given', async () => {
