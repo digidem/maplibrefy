@@ -56,9 +56,14 @@ const { style, changes } = await loadStyle(
 
 ```sh
 npx maplibrify style.json > maplibre-style.json
+curl -s "$STYLE_URL" | npx maplibrify --projection mercator > out.json
 ```
 
-The converted style goes to stdout and the list of changes to stderr.
+The converted style goes to stdout; the changes go to stderr, one per line
+in the form `kind: subject — reason` so they can be grepped, followed by a
+count. `--quiet` keeps only the count. Reads stdin when no file is given.
+Exit code 1 for unreadable input, invalid JSON or something that is not a
+style at all; a conversion with changes is still exit 0.
 
 ## API
 
@@ -99,7 +104,10 @@ matter to them:
 
 Wraps `convertStyle` for `map.setStyle(url, { transformStyle })`. Takes the
 same `projection` option plus `onChanges`, called with the change list after
-each conversion.
+each conversion. A conversion error is left to propagate, so MapLibre reports
+it as the style's error instead of loading half a style. The
+`TransformStyleFunction` type is declared here rather than imported from
+`maplibre-gl`, so this package's types resolve without it installed.
 
 ### `loadStyle(url, options?): Promise<ConvertResult>`
 
@@ -107,9 +115,11 @@ Fetches and converts a style. `url` may be an `http(s)` URL, a
 `mapbox://styles/{owner}/{id}` URI, or any of the share/preview URLs Mapbox
 Studio shows for a style. Mapbox URLs need `options.accessToken` (a token in
 the URL's `access_token` query parameter is also honoured). Relative `sprite`,
-`glyphs` and source `url`s are resolved against the style URL before
-conversion, because MapLibre does not do that itself for a style object.
-`options.fetch` injects a fetch implementation, mainly for tests.
+`glyphs`, source `url`s and GeoJSON `data` URLs are resolved against the URL
+the style was actually served from (after redirects) before conversion,
+because MapLibre does not do that itself for a style object. `tiles`
+templates are never touched. `options.fetch` injects a fetch implementation,
+mainly for tests.
 
 ### `maplibrify/mapbox-urls`
 
@@ -129,6 +139,19 @@ dependencies.
 - `createTransformRequest({ accessToken })` — a MapLibre
   `transformRequest` that rewrites `mapbox://` URLs and passes everything
   else through untouched, so no other provider's key is ever sent to Mapbox.
+  Without a token, a `mapbox://` URL throws, which MapLibre surfaces as the
+  style error.
+- `isMapboxServiceUrl(url)` — `true` for `mapbox://` or any `*.mapbox.com`
+  URL; `mapboxAccessToken({ url, accessToken })` — the token to use for a
+  style, `undefined` when the style is not served by Mapbox.
+- `normalizeTileURL(tileUrl, sourceUrl, tileSize?, { devicePixelRatio,
+supportsWebp })` — the `@2x` / `.webp` suffixes the Mapbox raster tile
+  API needs; a no-op for tiles of any other source.
+- `MAPBOX_TERMS_URL`, `MAPBOX_ATTRIBUTION` — for the attribution Mapbox's
+  terms require.
+
+Secret tokens (`sk.*`) are rejected with a message saying to use a public
+one; they must never reach a browser.
 
 ## What is converted
 
@@ -155,6 +178,14 @@ Not attempted, for now: mapping Mapbox `sky` layers or `fog` onto MapLibre's
 with the defaults in `schema`; and pulling in the layers of an imported
 Standard basemap, which lean on `config`, 3D lighting and `model` layers
 throughout and would render poorly even if they loaded.
+
+## Development
+
+`npm test` runs the unit tests in Node; `npm run test:e2e` loads each fixture
+into a real `maplibre-gl` in headless Chromium and asserts the raw Mapbox
+fixtures fail to load while the converted ones reach `style.load`. When a
+future MapLibre starts accepting one of those raw fixtures, that test fails on
+purpose: it means part of the conversion is no longer needed.
 
 ## Requirements
 
