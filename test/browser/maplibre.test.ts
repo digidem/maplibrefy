@@ -131,9 +131,7 @@ it('maplibre-clean loads raw and is left alone by the converter', async () => {
   expect(loaded).toBe(true)
 })
 
-// `createTransformStyle` still throws 'not implemented' on this branch; enable
-// this once the real implementation lands.
-it.skip('setStyle with createTransformStyle loads a raw Mapbox style', async () => {
+it('setStyle with createTransformStyle loads a raw Mapbox style', async () => {
   const map = createMap()
   const seen: Change[][] = []
   map.setStyle(localize(streetsV12), {

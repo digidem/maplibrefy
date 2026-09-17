@@ -19,11 +19,11 @@ does, so a Mapbox style needs both halves of this package to load.
 ### A MapLibre map in the browser
 
 ```ts
-import maplibregl from 'maplibre-gl'
+import { Map } from 'maplibre-gl'
 import { createTransformStyle } from 'maplibrify'
 import { createTransformRequest } from 'maplibrify/mapbox-urls'
 
-const map = new maplibregl.Map({
+const map = new Map({
   container: 'map',
   transformRequest: createTransformRequest({ accessToken: MAPBOX_TOKEN }),
 })
