@@ -1,6 +1,3 @@
-// The build program is `src` only, and TypeScript 6 no longer pulls in every
-// installed @types package, so this is the only place Node's types come from.
-/// <reference types="node" />
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { parseArgs } from 'node:util'
