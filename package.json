@@ -1,0 +1,89 @@
+{
+  "name": "maplibrify",
+  "version": "0.0.0",
+  "description": "Best-effort conversion of Mapbox GL styles so they load in MapLibre GL, plus mapbox:// URL rewriting",
+  "keywords": [
+    "maplibre",
+    "mapbox",
+    "style",
+    "convert",
+    "compat",
+    "transformStyle",
+    "transformRequest"
+  ],
+  "license": "MIT",
+  "repository": "github:digidem/maplibrify",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./mapbox-urls": {
+      "types": "./dist/mapbox-urls.d.ts",
+      "default": "./dist/mapbox-urls.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc",
+    "lint": "eslint .",
+    "test": "vitest run --project unit",
+    "test:e2e": "vitest run --project browser",
+    "test:e2e:install": "npx playwright install chromium",
+    "prepack": "npm run build",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "npm run build && changeset publish",
+    "prepare": "husky"
+  },
+  "peerDependencies": {
+    "@maplibre/maplibre-gl-style-spec": "^26.0.0"
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "^1.0.0",
+    "@changesets/cli": "^3.0.1",
+    "@eslint/js": "^10.0.1",
+    "@maplibre/maplibre-gl-style-spec": "^26.4.4",
+    "@trivago/prettier-plugin-sort-imports": "^6.0.2",
+    "@types/node": "^22.18.12",
+    "@vitest/browser-playwright": "^5.0.1",
+    "eslint": "^10.9.1",
+    "globals": "^17.12.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "maplibre-gl": "^6.10.0",
+    "playwright": "^1.63.0",
+    "prettier": "^3.9.6",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^5.0.1"
+  },
+  "prettier": {
+    "semi": false,
+    "singleQuote": true,
+    "importOrder": [
+      "^node:",
+      "<THIRD_PARTY_MODULES>",
+      "^[./]"
+    ],
+    "importOrderSeparation": true,
+    "plugins": [
+      "@trivago/prettier-plugin-sort-imports"
+    ]
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --cache --fix"
+    ],
+    "*.{ts,js,md,json,yml}": "prettier --write"
+  }
+}
