@@ -25,6 +25,9 @@
     },
     "./package.json": "./package.json"
   },
+  "bin": {
+    "maplibrify": "./dist/cli.js"
+  },
   "files": [
     "dist"
   ],
