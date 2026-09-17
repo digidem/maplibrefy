@@ -64,6 +64,10 @@ export async function run(argv: string[], io: CliIo): Promise<number> {
   }
 
   const file = args.positionals[0]
+  if (file === undefined && (io.stdin as { isTTY?: boolean }).isTTY) {
+    io.stderr.write(USAGE)
+    return 1
+  }
   let source: string
   try {
     source =
@@ -105,6 +109,8 @@ function describe(change: Change): string {
       return `imports-removed: ${change.ids.join(', ')}`
     case 'root-removed':
       return `root-removed: ${change.key}`
+    case 'root-property-removed':
+      return `root-property-removed: ${change.key}.${change.property} — ${change.reason}`
     case 'projection-rewritten':
       return `projection-rewritten: ${change.from} → ${change.to}`
     case 'expression-rewritten':
@@ -117,6 +123,8 @@ function describe(change: Change): string {
       return `layer-removed: ${change.layerId} (${change.layerType}) — ${change.reason}`
     case 'source-removed':
       return `source-removed: ${change.sourceId} (layers: ${change.layerIds.join(', ')}) — ${change.reason}`
+    case 'source-property-removed':
+      return `source-property-removed: ${change.sourceId} ${change.property} — ${change.reason}`
   }
 }
 

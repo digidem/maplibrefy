@@ -140,6 +140,84 @@ describe('projection', () => {
       expect(result.changes).toEqual([])
     }
   })
+
+  it.each([
+    'albers',
+    'equalEarth',
+    'naturalEarth',
+    'winkelTripel',
+    'lambertConformalConic',
+    'equirectangular',
+    'made-up',
+  ])('rewrites the Mapbox-only %s projection to mercator', (name) => {
+    for (const mode of ['keep', 'mercator'] as const) {
+      const result = convert(
+        style({ projection: { name, center: [0, 30], parallels: [30, 45] } }),
+        { projection: mode },
+      )
+      expect(result.style.projection).toEqual({ type: 'mercator' })
+      expect(result.changes).toEqual([
+        { kind: 'projection-rewritten', from: name, to: 'mercator' },
+      ])
+    }
+  })
+
+  it('keeps a MapLibre vertical-perspective projection', () => {
+    const result = convert(
+      style({ projection: { type: 'vertical-perspective' } }),
+    )
+    expect(result.style.projection).toEqual({ type: 'vertical-perspective' })
+    expect(result.changes).toEqual([])
+  })
+
+  it('drops center and parallels along with a rewritten type', () => {
+    const result = convert(
+      style({
+        projection: { type: 'albers', center: [0, 0], parallels: [1, 2] },
+      }),
+    )
+    expect(result.style.projection).toEqual({ type: 'mercator' })
+    expect(result.changes).toEqual([
+      { kind: 'projection-rewritten', from: 'albers', to: 'mercator' },
+    ])
+  })
+
+  it('leaves a null projection to the validator', () => {
+    const result = convert(style({ projection: null }), {
+      projection: 'mercator',
+    })
+    expect(result.style).not.toHaveProperty('projection')
+    expect(result.changes).toEqual([
+      {
+        kind: 'root-removed',
+        key: 'projection',
+        reason: 'object expected, null found',
+      },
+    ])
+  })
+
+  it('leaves an empty projection object alone', () => {
+    for (const projection of ['keep', 'mercator'] as const) {
+      const result = convert(style({ projection: {} }), { projection })
+      expect(result.style.projection).toEqual({})
+      expect(result.changes).toEqual([])
+    }
+  })
+
+  it('leaves a projection with a non-string name to the validator', () => {
+    const result = convert(style({ projection: { name: 5 } }), {
+      projection: 'mercator',
+    })
+    expect(result.style.projection).toEqual({})
+    expect(result.changes).toEqual([
+      {
+        kind: 'root-property-removed',
+        key: 'projection',
+        property: 'name',
+        reason: 'unknown property "name"',
+      },
+    ])
+  })
 })
 
 describe('Mapbox-only root keys', () => {
@@ -644,9 +722,8 @@ describe('validator-driven pruning', () => {
   it.each([
     ['sprite', 5, 'string expected, number found'],
     ['glyphs', 7, 'string expected, number found'],
-    ['sky', { 'sky-type': 'atmosphere' }, 'unknown property "sky-type"'],
     ['light', { anchor: 'bogus' }, expect.stringContaining('"bogus" found')],
-    ['terrain', { foo: 1 }, 'unknown property "foo"'],
+    ['center', 'here', 'array expected, string found'],
   ])(
     'removes root key %s when the validator rejects it',
     (key, value, reason) => {
@@ -655,6 +732,208 @@ describe('validator-driven pruning', () => {
       expect(result.changes).toEqual([{ kind: 'root-removed', key, reason }])
     },
   )
+
+  it.each([
+    ['sky', 'sky-type', { 'sky-color': '#123' }],
+    ['light', 'foo', { anchor: 'map' }],
+    ['terrain', 'foo', { source: 'dem' }],
+    ['projection', 'foo', { type: 'globe' }],
+  ])(
+    'removes only an unknown property from root key %s',
+    (key, property, rest) => {
+      const value = { ...rest, [property]: 'anything' }
+      const result = convert(
+        style({
+          sources: { dem: { type: 'raster-dem', url: 'https://x/dem.json' } },
+          [key]: value,
+        }),
+      )
+      expect(result.style).toHaveProperty(key, rest)
+      expect(result.changes).toEqual([
+        {
+          kind: 'root-property-removed',
+          key,
+          property,
+          reason: `unknown property "${property}"`,
+        },
+      ])
+    },
+  )
+
+  it('blames projection, not the root center, for projection.center', () => {
+    const result = convert(
+      style({
+        center: [10, 20],
+        projection: { type: 'mercator', center: [0, 0] },
+      }),
+    )
+    expect(result.style).toMatchObject({
+      center: [10, 20],
+      projection: { type: 'mercator' },
+    })
+    expect(result.changes).toEqual([
+      {
+        kind: 'root-property-removed',
+        key: 'projection',
+        property: 'center',
+        reason: 'unknown property "center"',
+      },
+    ])
+  })
+
+  it('resolves the same unknown property reported by two owners', () => {
+    const result = convert(
+      style({
+        projection: { type: 'globe', foo: 1 },
+        light: { anchor: 'map', foo: 2 },
+      }),
+    )
+    expect(result.style).toMatchObject({
+      projection: { type: 'globe' },
+      light: { anchor: 'map' },
+    })
+    expect(result.changes).toEqual([
+      expect.objectContaining({
+        kind: 'root-property-removed',
+        key: 'projection',
+        property: 'foo',
+      }),
+      expect.objectContaining({
+        kind: 'root-property-removed',
+        key: 'light',
+        property: 'foo',
+      }),
+    ])
+  })
+
+  it('removes an unknown source property and keeps the source', () => {
+    const result = convert(
+      style(
+        {
+          sources: {
+            g: { type: 'geojson', data: 'https://x/a.json', dynamic: true },
+          },
+        },
+        [{ id: 'dots', type: 'circle', source: 'g' }],
+      ),
+    )
+    expect(result.style.sources.g).toEqual({
+      type: 'geojson',
+      data: 'https://x/a.json',
+    })
+    expect(layerIds(result)).toEqual(['dots'])
+    expect(result.changes).toEqual([
+      {
+        kind: 'source-property-removed',
+        sourceId: 'g',
+        property: 'dynamic',
+        reason: 'unknown property "dynamic"',
+      },
+    ])
+  })
+
+  it('removes a source property with a bad value', () => {
+    const result = convert(
+      style({
+        sources: {
+          v: { type: 'vector', url: 'https://x/t.json', minzoom: 'low' },
+        },
+      }),
+    )
+    expect(result.style.sources.v).toEqual({
+      type: 'vector',
+      url: 'https://x/t.json',
+    })
+    expect(result.changes).toEqual([
+      {
+        kind: 'source-property-removed',
+        sourceId: 'v',
+        property: 'minzoom',
+        reason: 'number expected, string found',
+      },
+    ])
+  })
+
+  it('removes a source the validator rejects as a whole', () => {
+    const result = convert(
+      style({ sources: { g: { type: 'geojson', dynamic: true } } }, [
+        { id: 'dots', type: 'circle', source: 'g' },
+      ]),
+    )
+    expect(result.style.sources).toEqual({})
+    expect(layerIds(result)).toEqual([])
+    expect(result.changes).toEqual([
+      {
+        kind: 'source-removed',
+        sourceId: 'g',
+        layerIds: ['dots'],
+        reason: 'missing required property "data"',
+      },
+    ])
+  })
+
+  it('matches a source id containing ": "', () => {
+    const result = convert(
+      style(
+        {
+          sources: {
+            'my: src': { type: 'raster-array', url: 'mapbox://x' },
+            'my: other': {
+              type: 'geojson',
+              data: 'https://x/a.json',
+              dynamic: true,
+            },
+          },
+        },
+        [{ id: 'w', type: 'raster', source: 'my: src' }],
+      ),
+    )
+    expect(Object.keys(result.style.sources)).toEqual(['my: other'])
+    expect(result.changes).toEqual([
+      {
+        kind: 'source-removed',
+        sourceId: 'my: src',
+        layerIds: ['w'],
+        reason: expect.stringContaining('"raster-array" found'),
+      },
+      {
+        kind: 'source-property-removed',
+        sourceId: 'my: other',
+        property: 'dynamic',
+        reason: 'unknown property "dynamic"',
+      },
+    ])
+  })
+
+  it('removes terrain along with its source', () => {
+    const result = convert(
+      style(
+        {
+          sources: {
+            v: { type: 'vector', url: 'https://x/t.json' },
+            dem: { type: 'raster-array', url: 'mapbox://x.dem' },
+          },
+          terrain: { source: 'dem', exaggeration: 1.5 },
+        },
+        [{ id: 'hills', type: 'hillshade', source: 'dem' }, line()],
+      ),
+    )
+    expect(result.style).not.toHaveProperty('terrain')
+    expect(layerIds(result)).toEqual(['road'])
+    expect(result.changes).toEqual([
+      {
+        kind: 'source-removed',
+        sourceId: 'dem',
+        layerIds: ['hills'],
+        reason: expect.stringContaining('"raster-array" found'),
+      },
+      {
+        kind: 'root-removed',
+        key: 'terrain',
+        reason: 'its source "dem" was removed',
+      },
+    ])
+  })
 
   it('reports real layer ids when several layers go in one pass', () => {
     const result = convert(

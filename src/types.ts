@@ -3,6 +3,14 @@ import type { StyleSpecification } from '@maplibre/maplibre-gl-style-spec'
 /** One edit made to a style to make MapLibre accept it. */
 export type Change =
   | { kind: 'root-removed'; key: string; reason: string }
+  /** One property of `projection`, `light`, `sky` or `terrain` was dropped;
+   *  the rest of the object is kept. */
+  | {
+      kind: 'root-property-removed'
+      key: string
+      property: string
+      reason: string
+    }
   /** The style was built on an imported basemap (Mapbox Standard); only the
    *  style's own layers remain. Apps should tell the user. */
   | { kind: 'imports-removed'; ids: string[] }
@@ -26,6 +34,13 @@ export type Change =
       kind: 'source-removed'
       sourceId: string
       layerIds: string[]
+      reason: string
+    }
+  /** One property of a source was dropped; the source and its layers stay. */
+  | {
+      kind: 'source-property-removed'
+      sourceId: string
+      property: string
       reason: string
     }
 

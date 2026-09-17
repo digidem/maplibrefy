@@ -99,6 +99,65 @@ describe('resolving the style URL', () => {
     expect(fetch.calls).toEqual(['https://example.com/styles/s.json?v=2'])
   })
 
+  it('fetches an API style URL as pasted, keeping its query', async () => {
+    const fetch = fakeFetch(MINIMAL)
+    await loadStyle(
+      'https://api.mapbox.com/styles/v1/acme/ckabc123?fresh=true&access_token=pk.url',
+      { fetch },
+    )
+    expect(fetch.calls).toEqual([
+      'https://api.mapbox.com/styles/v1/acme/ckabc123?fresh=true&access_token=pk.url',
+    ])
+  })
+
+  it('replaces the token of a pasted API style URL with the option token', async () => {
+    const fetch = fakeFetch(MINIMAL)
+    await loadStyle(
+      'https://api.mapbox.com/styles/v1/acme/ckabc123/draft?fresh=true&access_token=pk.url',
+      { accessToken: TOKEN, fetch },
+    )
+    expect(fetch.calls).toEqual([
+      `https://api.mapbox.com/styles/v1/acme/ckabc123/draft?fresh=true&access_token=${TOKEN}`,
+    ])
+  })
+
+  it('adds the option token to a pasted API style URL without one', async () => {
+    const fetch = fakeFetch(MINIMAL)
+    await loadStyle(
+      'https://api.mapbox.com/styles/v1/acme/ckabc123?fresh=true',
+      {
+        accessToken: TOKEN,
+        fetch,
+      },
+    )
+    expect(fetch.calls).toEqual([
+      `https://api.mapbox.com/styles/v1/acme/ckabc123?fresh=true&access_token=${TOKEN}`,
+    ])
+  })
+
+  it('throws for a pasted API style URL with no token anywhere', async () => {
+    const fetch = fakeFetch(MINIMAL)
+    await expect(
+      loadStyle('https://api.mapbox.com/styles/v1/acme/ckabc123?fresh=true', {
+        fetch,
+      }),
+    ).rejects.toThrow(/access token is required/i)
+    expect(fetch.calls).toEqual([])
+  })
+
+  it.each([
+    'https://api.mapbox.com/styles/v1/acme/ckabc123.html?fresh=true&access_token=pk.url',
+    'https://api.mapbox.com/styles/v1/acme/ckabc123/wmts?fresh=true&access_token=pk.url',
+    'https://api.mapbox.com/styles/v1/acme/ckabc123/?fresh=true&access_token=pk.url',
+    'http://api.mapbox.com/styles/v1/acme/ckabc123?fresh=true&access_token=pk.url',
+  ])('collapses %s to the API style URL', async (url) => {
+    const fetch = fakeFetch(MINIMAL)
+    await loadStyle(url, { fetch })
+    expect(fetch.calls).toEqual([
+      'https://api.mapbox.com/styles/v1/acme/ckabc123?access_token=pk.url',
+    ])
+  })
+
   it('throws a TypeError for a non-http URL', async () => {
     const fetch = fakeFetch(MINIMAL)
     await expect(
@@ -193,6 +252,21 @@ describe('resolving relative URLs in the style', () => {
     expect(style.sources.points).toMatchObject({
       data: 'https://example.org/points.geojson',
     })
+  })
+
+  it('leaves data: and blob: values untouched', async () => {
+    const data = 'data:application/geo+json,{"type":"FeatureCollection"}'
+    const blob = 'blob:https://example.com/0b6a1b2c'
+    const { style } = await loadStyle('https://example.com/styles/s.json', {
+      fetch: fakeFetch({
+        version: 8,
+        sprite: blob,
+        sources: { points: { type: 'geojson', data } },
+        layers: [],
+      }),
+    })
+    expect(style.sprite).toBe(blob)
+    expect(style.sources.points).toMatchObject({ data })
   })
 
   it('resolves each entry of a sprite array', async () => {

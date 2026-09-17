@@ -13,13 +13,23 @@ export interface MutableStyle {
 
 const MAX_PASSES = 50
 const PROTECTED_ROOT_KEYS = new Set(['version', 'layers', 'sources'])
+/** Root objects whose child errors the spec reports by the child key alone. */
+const CHILD_KEYED_ROOTS = ['projection', 'light', 'sky', 'terrain']
+const UNKNOWN_PROPERTY_RE = /^unknown property "(.+)"$/s
 
 type Target =
   | { kind: 'property'; index: number; group: 'paint' | 'layout'; name: string }
   | { kind: 'filter'; index: number }
   | { kind: 'layer'; index: number; isType: boolean }
   | { kind: 'source'; id: string }
+  | { kind: 'source-property'; id: string; property: string }
   | { kind: 'root'; key: string }
+  | { kind: 'root-property'; key: string; property: string }
+
+interface Classified {
+  target: Target
+  reason: string
+}
 
 /** Messages of the validation errors MapLibre would refuse the style for. */
 export function validationErrors(style: unknown): string[] {
@@ -49,7 +59,9 @@ function applyPass(
   changes: Change[],
 ): void {
   const roots = new Map<string, string>()
+  const rootProperties = new Map<string, Map<string, string>>()
   const sources = new Map<string, string>()
+  const sourceProperties = new Map<string, Map<string, string>>()
   const layers = new Map<number, string>()
   const filters = new Map<number, string>()
   const properties = new Map<
@@ -58,13 +70,19 @@ function applyPass(
   >()
 
   for (const message of messages) {
-    const { target, reason } = classify(message, style)
+    const { target, reason } = classify(message, messages, style)
     switch (target.kind) {
       case 'root':
         if (!roots.has(target.key)) roots.set(target.key, reason)
         break
+      case 'root-property':
+        addNested(rootProperties, target.key, target.property, reason)
+        break
       case 'source':
         if (!sources.has(target.id)) sources.set(target.id, reason)
+        break
+      case 'source-property':
+        addNested(sourceProperties, target.id, target.property, reason)
         break
       case 'layer':
         // A bad type is the reason worth reporting when a layer has several.
@@ -91,6 +109,16 @@ function applyPass(
     changes.push({ kind: 'root-removed', key, reason })
   }
 
+  for (const [key, forKey] of rootProperties) {
+    if (roots.has(key)) continue
+    const owner = style[key]
+    if (!isObject(owner)) continue
+    for (const [property, reason] of forKey) {
+      delete owner[property]
+      changes.push({ kind: 'root-property-removed', key, property, reason })
+    }
+  }
+
   const removed = new Set<number>()
   for (const [sourceId, reason] of sources) {
     const layerIds: string[] = []
@@ -101,6 +129,30 @@ function applyPass(
     })
     delete (style.sources as Record<string, unknown>)[sourceId]
     changes.push({ kind: 'source-removed', sourceId, layerIds, reason })
+    // The validator does not check that terrain's source exists; MapLibre does.
+    if (isObject(style.terrain) && style.terrain.source === sourceId) {
+      delete style.terrain
+      changes.push({
+        kind: 'root-removed',
+        key: 'terrain',
+        reason: `its source "${sourceId}" was removed`,
+      })
+    }
+  }
+
+  for (const [sourceId, forSource] of sourceProperties) {
+    if (sources.has(sourceId)) continue
+    const source = (style.sources as Record<string, unknown>)[sourceId]
+    if (!isObject(source)) continue
+    for (const [property, reason] of forSource) {
+      delete source[property]
+      changes.push({
+        kind: 'source-property-removed',
+        sourceId,
+        property,
+        reason,
+      })
+    }
   }
 
   for (const [index, reason] of layers) {
@@ -145,12 +197,27 @@ function applyPass(
   }
 }
 
+function addNested(
+  map: Map<string, Map<string, string>>,
+  outer: string,
+  inner: string,
+  reason: string,
+): void {
+  const forOuter = map.get(outer) ?? new Map<string, string>()
+  map.set(outer, forOuter)
+  if (!forOuter.has(inner)) forOuter.set(inner, reason)
+}
+
 function classify(
   message: string,
+  messages: string[],
   style: MutableStyle,
-): { target: Target; reason: string } {
+): Classified {
+  const source = classifySource(message, style)
+  if (source) return source
+
   const match = /^(.+?): (.*)$/s.exec(message)
-  if (!match) throw new Error(`convertStyle: cannot repair "${message}"`)
+  if (!match) throw cannotRepair(message)
   const [, key, reason] = match as unknown as [string, string, string]
 
   const layer = /^layers\[(\d+)\](.*)$/s.exec(key)
@@ -174,24 +241,59 @@ function classify(
     }
   }
 
-  if (key.startsWith('sources.')) {
-    const id = matchSourceId(key.slice('sources.'.length), style)
-    if (id !== undefined) return { target: { kind: 'source', id }, reason }
-  }
-
   const head = key.split(/[.[]/, 1)[0]!
-  if (PROTECTED_ROOT_KEYS.has(head)) {
-    throw new Error(`convertStyle: cannot repair "${message}"`)
+  if (PROTECTED_ROOT_KEYS.has(head)) throw cannotRepair(message)
+  if (head !== key) {
+    if (head in style) return { target: { kind: 'root', key: head }, reason }
+    throw cannotRepair(message)
   }
-  if (head in style) return { target: { kind: 'root', key: head }, reason }
 
-  // The spec reports errors inside `projection`, `light`, `sky` and `terrain`
-  // by the child key alone, so find the owner by elimination.
-  const owner = findRootOwner(message, style)
-  if (owner === undefined) {
-    throw new Error(`convertStyle: cannot repair "${message}"`)
+  // A bare key is a root key or a child of projection, light, sky or terrain,
+  // which the spec reports by the child key alone. A root key of the same
+  // name (`center`) must not take the blame, so never guess by name.
+  const owner = findRootOwner(
+    message,
+    messages,
+    [key, ...CHILD_KEYED_ROOTS],
+    style,
+  )
+  if (owner === undefined) throw cannotRepair(message)
+  const child = UNKNOWN_PROPERTY_RE.exec(reason)?.[1]
+  const value = style[owner]
+  if (
+    child !== undefined &&
+    CHILD_KEYED_ROOTS.includes(owner) &&
+    isObject(value) &&
+    child in value
+  ) {
+    return {
+      target: { kind: 'root-property', key: owner, property: child },
+      reason,
+    }
   }
   return { target: { kind: 'root', key: owner }, reason }
+}
+
+/** `sources.<id>[.<property>…]: <reason>`, where the id may itself contain
+ *  dots or `: `, so the style's real source ids decide where it ends. */
+function classifySource(
+  message: string,
+  style: MutableStyle,
+): Classified | undefined {
+  if (!message.startsWith('sources.')) return undefined
+  const rest = message.slice('sources.'.length)
+  const id = matchSourceId(rest, style)
+  if (id === undefined) return undefined
+  const tail = /^(.*?): (.*)$/s.exec(rest.slice(id.length))
+  if (!tail) return undefined
+  const [, path, reason] = tail as unknown as [string, string, string]
+  const property =
+    /^\.([^.[]+)/.exec(path)?.[1] ??
+    (path === '' ? UNKNOWN_PROPERTY_RE.exec(reason)?.[1] : undefined)
+  if (property === undefined || property === 'type') {
+    return { target: { kind: 'source', id }, reason }
+  }
+  return { target: { kind: 'source-property', id, property }, reason }
 }
 
 /** Source ids may contain dots, so prefer the longest id the key starts with. */
@@ -200,23 +302,42 @@ function matchSourceId(rest: string, style: MutableStyle): string | undefined {
   let best: string | undefined
   for (const id of Object.keys(style.sources)) {
     const matches =
-      rest === id || rest.startsWith(`${id}.`) || rest.startsWith(`${id}[`)
+      rest.startsWith(`${id}.`) ||
+      rest.startsWith(`${id}[`) ||
+      rest.startsWith(`${id}: `)
     if (matches && (best === undefined || id.length > best.length)) best = id
   }
   return best
 }
 
+/** The first candidate whose removal makes `message` go away. Occurrences are
+ *  counted rather than tested for, as two owners can report the same text. */
 function findRootOwner(
   message: string,
+  messages: string[],
+  candidates: string[],
   style: MutableStyle,
 ): string | undefined {
-  for (const key of Object.keys(style)) {
-    if (PROTECTED_ROOT_KEYS.has(key)) continue
+  const before = count(messages, message)
+  const tried = new Set<string>()
+  for (const key of candidates) {
+    if (tried.has(key) || PROTECTED_ROOT_KEYS.has(key) || !(key in style)) {
+      continue
+    }
+    tried.add(key)
     const probe: Record<string, unknown> = { ...style }
     delete probe[key]
-    if (!validationErrors(probe).includes(message)) return key
+    if (count(validationErrors(probe), message) < before) return key
   }
   return undefined
+}
+
+function count(messages: string[], message: string): number {
+  return messages.filter((candidate) => candidate === message).length
+}
+
+function cannotRepair(message: string): Error {
+  return new Error(`convertStyle: cannot repair "${message}"`)
 }
 
 function layerId(layer: unknown): string {

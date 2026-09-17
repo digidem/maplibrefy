@@ -51,22 +51,30 @@ function isStyle(value: unknown): value is MutableStyle {
   return isObject(value) && value.version === 8 && Array.isArray(value.layers)
 }
 
+// The names maplibre-gl's src/geo/projection/projection_factory.ts can build.
+// The validator accepts any string; the runtime logs "Unknown projection
+// name" for the rest and renders mercator anyway.
+const MAPLIBRE_PROJECTIONS = new Set([
+  'mercator',
+  'globe',
+  'vertical-perspective',
+])
+
 function rewriteProjection(
   style: MutableStyle,
   mode: 'keep' | 'mercator',
   changes: Change[],
 ): void {
   const projection = style.projection
-  if (projection === undefined) return
-  const current = isObject(projection)
-    ? (projection.type ?? projection.name)
-    : projection
-  const from = typeof current === 'string' ? current : JSON.stringify(current)
-  const to = mode === 'mercator' ? 'mercator' : from
-  const unchanged =
-    isObject(projection) && !('name' in projection) && to === from
-  if (unchanged) return
-  style.projection = { type: mode === 'mercator' ? 'mercator' : current }
+  // Anything without a usable name is left to the validator.
+  if (!isObject(projection)) return
+  const from = projection.type ?? projection.name
+  if (typeof from !== 'string') return
+  const to =
+    mode === 'mercator' || !MAPLIBRE_PROJECTIONS.has(from) ? 'mercator' : from
+  if (to === from && !('name' in projection)) return
+  // Replacing the object also drops Mapbox's `center`/`parallels` siblings.
+  style.projection = { type: to }
   changes.push({ kind: 'projection-rewritten', from, to })
 }
 

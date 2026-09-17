@@ -183,6 +183,55 @@ describe('run', () => {
       reported.find((line) => line.startsWith('source-removed: weather')),
     ).toMatch(/^source-removed: weather \(layers: wind, weather-raster\) — /)
   })
+
+  it('describes property removals on sources and root objects', async () => {
+    const { code, err } = await cli(
+      [],
+      JSON.stringify({
+        version: 8,
+        sources: { g: { type: 'geojson', data: 'https://x/a', dynamic: true } },
+        layers: [],
+        light: { anchor: 'map', foo: 1 },
+      }),
+    )
+    expect(code).toBe(0)
+    expect(lines(err)).toEqual([
+      'root-property-removed: light.foo — unknown property "foo"',
+      'source-property-removed: g dynamic — unknown property "dynamic"',
+      '2 changes',
+    ])
+  })
+
+  it('prints usage instead of waiting on a terminal stdin', async () => {
+    const stdin = Object.assign(Readable.from([]), { isTTY: true })
+    const stdout = new PassThrough()
+    const stderr = new PassThrough()
+    const collected = Promise.all([text(stdout), text(stderr)])
+    const code = await run([], { stdin, stdout, stderr })
+    stdout.end()
+    stderr.end()
+    const [out, err] = await collected
+    expect(code).toBe(1)
+    expect(out).toBe('')
+    expect(err).toMatch(/^maplibrify — /)
+    expect(err).toMatch(/Usage: maplibrify \[file\] \[options\]/)
+  })
+
+  it('still reads a terminal stdin when "-" is given', async () => {
+    const stdin = Object.assign(
+      Readable.from([fixtureText('maplibre-clean.json')]),
+      { isTTY: true },
+    )
+    const stdout = new PassThrough()
+    const stderr = new PassThrough()
+    const collected = Promise.all([text(stdout), text(stderr)])
+    const code = await run(['-'], { stdin, stdout, stderr })
+    stdout.end()
+    stderr.end()
+    const [out] = await collected
+    expect(code).toBe(0)
+    expect(JSON.parse(out).version).toBe(8)
+  })
 })
 
 describe('dist/cli.js', () => {

@@ -12,8 +12,13 @@ export interface LoadStyleOptions extends ConvertOptions {
   fetch?: typeof fetch
 }
 
-const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i
+// The scheme shape of URL_RE in mapbox-urls.ts; `data:` and `blob:` lack `//`.
+const ABSOLUTE_RE = /^(?:[a-z][a-z0-9+.-]*:\/\/|data:|blob:)/i
 const HTTP_RE = /^https?:\/\//i
+/** An api.mapbox.com URL whose path is exactly a style: nothing after the id
+ *  (or `/draft`) but the query. */
+const API_STYLE_RE =
+  /^https:\/\/api\.mapbox\.com\/styles\/v1\/[\w-]+\/[\w-]+(?:\/draft)?(?:[?#]|$)/i
 
 /** Fetch a style by URL (including `mapbox://` and Studio share links),
  *  resolve its relative URLs against the style URL, and convert it. */
@@ -36,14 +41,19 @@ export async function loadStyle(
 }
 
 function styleRequestUrl(url: string, accessToken?: string): string {
-  const ref = parseMapboxStyleUrl(url)
+  const trimmed = url.trim()
+  const ref = parseMapboxStyleUrl(trimmed)
   if (ref) {
-    return normalizeMapboxUrl(
-      mapboxStyleUri(ref),
-      accessToken ?? ref.accessToken,
-    )
+    const token = accessToken ?? ref.accessToken
+    const normalized = normalizeMapboxUrl(mapboxStyleUri(ref), token)
+    if (!API_STYLE_RE.test(trimmed) || token === undefined) return normalized
+    // Already an API URL: fetch it as pasted so its other query parameters
+    // survive (Studio share links carry `fresh=true` to bypass the cache).
+    const out = new URL(trimmed)
+    out.searchParams.set('access_token', token)
+    return out.href
   }
-  if (!HTTP_RE.test(url.trim())) {
+  if (!HTTP_RE.test(trimmed)) {
     throw new TypeError(
       `loadStyle: expected an http(s) URL or a mapbox:// style URL, got ${url}`,
     )
@@ -78,7 +88,7 @@ function resolveStyleUrls(style: Record<string, unknown>, base: string): void {
 }
 
 function resolveUrl(value: string, base: string): string {
-  if (SCHEME_RE.test(value)) return value
+  if (ABSOLUTE_RE.test(value)) return value
   const placeholder = value.indexOf('{')
   if (placeholder === -1) return new URL(value, base).href
   // `new URL` percent-encodes braces, so resolve only the path up to the
