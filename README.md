@@ -1,11 +1,11 @@
-# maplibrify
+# maplibrefy
 
 Load Mapbox GL styles in MapLibre GL. The two style specifications have
 diverged since the fork: a style saved from Mapbox Studio today carries
 properties, expressions and layer types MapLibre does not know, and MapLibre
 rejects the whole style on the first one it meets, leaving a blank map.
 
-`maplibrify` makes a best-effort conversion. Everything MapLibre can render is
+`maplibrefy` makes a best-effort conversion. Everything MapLibre can render is
 kept; a few Mapbox-only expressions are rewritten to equivalents; whatever
 cannot be expressed is removed and reported, so an app can tell its user what
 was lost. It is not pixel-perfect and does not try to be: the goal is that a
@@ -20,8 +20,8 @@ does, so a Mapbox style needs both halves of this package to load.
 
 ```ts
 import { Map } from 'maplibre-gl'
-import { createTransformStyle } from 'maplibrify'
-import { createTransformRequest } from 'maplibrify/mapbox-urls'
+import { createTransformStyle } from 'maplibrefy'
+import { createTransformRequest } from 'maplibrefy/mapbox-urls'
 
 const map = new Map({
   container: 'map',
@@ -29,7 +29,7 @@ const map = new Map({
 })
 map.setStyle('mapbox://styles/mapbox/satellite-streets-v12', {
   transformStyle: createTransformStyle({
-    onChanges: (changes) => console.info('maplibrify:', changes),
+    onChanges: (changes) => console.info('maplibrefy:', changes),
   }),
 })
 ```
@@ -40,7 +40,7 @@ so the map is created without a style and the style set afterwards.
 ### Anywhere else
 
 ```ts
-import { convertStyle, loadStyle } from 'maplibrify'
+import { convertStyle, loadStyle } from 'maplibrefy'
 
 // A style object you already have:
 const { style, changes } = convertStyle(mapboxStyle)
@@ -55,8 +55,8 @@ const { style, changes } = await loadStyle(
 ### Command line
 
 ```sh
-npx maplibrify style.json > maplibre-style.json
-curl -s "$STYLE_URL" | npx maplibrify --projection mercator > out.json
+npx maplibrefy style.json > maplibre-style.json
+curl -s "$STYLE_URL" | npx maplibrefy --projection mercator > out.json
 ```
 
 The converted style goes to stdout; the changes go to stderr, one per line
@@ -126,7 +126,7 @@ because MapLibre does not do that itself for a style object. `tiles`
 templates are never touched. `options.fetch` injects a fetch implementation,
 mainly for tests.
 
-### `maplibrify/mapbox-urls`
+### `maplibrefy/mapbox-urls`
 
 The URL half, on its own subpath so it can be used without pulling in the
 converter and its dependency on `@maplibre/maplibre-gl-style-spec`. No

@@ -1,4 +1,4 @@
-// Subpath export `maplibrify/mapbox-urls`: must not import the converter or
+// Subpath export `maplibrefy/mapbox-urls`: must not import the converter or
 // the style spec, so it stays a few hundred bytes.
 
 const API_URL = 'https://api.mapbox.com'

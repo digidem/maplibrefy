@@ -1,8 +1,8 @@
 ---
-'maplibrify': minor
+'maplibrefy': minor
 ---
 
-Add the `maplibrify/mapbox-urls` subpath export: `isMapboxUrl`,
+Add the `maplibrefy/mapbox-urls` subpath export: `isMapboxUrl`,
 `isMapboxServiceUrl`, `normalizeMapboxUrl`, `normalizeTileURL`,
 `parseMapboxStyleUrl`, `mapboxStyleUri`, `mapboxAccessToken`,
 `createTransformRequest` and the Mapbox terms and attribution constants. It has
