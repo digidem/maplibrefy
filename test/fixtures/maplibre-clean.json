@@ -1,0 +1,57 @@
+{
+  "version": 8,
+  "name": "Plain MapLibre",
+  "projection": { "type": "mercator" },
+  "sprite": "https://example.com/sprite",
+  "glyphs": "https://example.com/fonts/{fontstack}/{range}.pbf",
+  "light": { "anchor": "viewport" },
+  "sources": {
+    "osm": { "type": "vector", "url": "https://example.com/tiles.json" },
+    "points": {
+      "type": "geojson",
+      "data": { "type": "FeatureCollection", "features": [] }
+    }
+  },
+  "layers": [
+    {
+      "id": "bg",
+      "type": "background",
+      "paint": { "background-color": "#fff" }
+    },
+    {
+      "id": "roads",
+      "type": "line",
+      "source": "osm",
+      "source-layer": "road",
+      "filter": ["all", ["==", ["get", "class"], "primary"], ["has", "name"]],
+      "layout": { "line-join": "round" },
+      "paint": {
+        "line-width": {
+          "stops": [
+            [5, 1],
+            [15, 4]
+          ]
+        },
+        "line-dasharray": [2, 1],
+        "line-color": [
+          "match",
+          ["get", "kind"],
+          ["pitch", "hsl"],
+          "#f00",
+          "#00f"
+        ]
+      }
+    },
+    {
+      "id": "labels",
+      "type": "symbol",
+      "source": "points",
+      "layout": {
+        "text-field": ["get", "name"],
+        "text-offset": [0, 1],
+        "text-font": ["literal", ["Open Sans Regular"]]
+      },
+      "paint": { "text-color": "hsl(200, 50%, 50%)" }
+    }
+  ]
+}
