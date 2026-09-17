@@ -166,12 +166,14 @@ Rewritten to a MapLibre equivalent:
 
 Removed, with a `Change` for each: the Mapbox-only top-level keys (`fog`,
 `imports`, `schema`, `lights`, `snow`, `rain`, `camera`, `color-theme`,
-`featuresets`, `iconsets`, `models`, `indoor`, `fragment`); `slot` and
-`appearances` on layers; layer and source types MapLibre lacks; and then
-whatever else the MapLibre style validator still rejects, property by
-property. That last step is what keeps the conversion honest against the
-MapLibre version actually installed, rather than a hand-written list of
-differences that goes stale.
+`featuresets`, `iconsets`, `models`, `indoor`, `fragment`); layer and source
+types MapLibre lacks; and then whatever else the MapLibre style validator
+still rejects, property by property. That last step is what keeps the
+conversion honest against the MapLibre version actually installed, rather
+than a hand-written list of differences that goes stale.
+
+Removed silently: `slot` and `appearances` on layers. MapLibre ignores them
+and nothing visible changes, so they are not worth a `Change`.
 
 Not attempted, for now: mapping Mapbox `sky` layers or `fog` onto MapLibre's
 `sky`; mapping `lights` to `light`; substituting `["config", …]` expressions
